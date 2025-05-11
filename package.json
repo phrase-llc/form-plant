@@ -1,0 +1,13 @@
+{
+  "name": "form-plant",
+  "version": "1.0.0",
+  "repository": "git@github.com:phrase-llc/form-plant.git",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler pages dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "wrangler": "^4.14.4"
+  }
+}
