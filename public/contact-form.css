@@ -1,30 +1,120 @@
+/* === フォーム全体 === */
 .fp-form {
     max-width: 500px;
     margin: 1em auto;
     font-family: sans-serif;
 }
 
+/* === 各フォームフィールド === */
 .fp-field {
     margin-bottom: 0.75em;
 }
 
-.fp-input,
-.fp-textarea {
-    width: 100%;
-    padding: 0.5em;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+.fp-label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.25em;
 }
 
+/* === テキスト入力 & テキストエリア === */
+.fp-input,
+.fp-textarea,
+.fp-select {
+    width: 100%;
+    padding: 0.5em;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* === セレクトボックス（ドロップダウン） === */
+.fp-select {
+    background-color: white;
+    appearance: none;
+}
+
+/* === チェックボックス === */
+.fp-checkbox {
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+.fp-label:has(.fp-checkbox) {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-weight: normal;
+}
+
+/* === 送信ボタン === */
 .fp-submit {
     padding: 0.5em 1em;
-    background: #007bff;
+    background-color: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
+    font-size: 1em;
+    cursor: pointer;
+}
+.fp-submit:hover {
+    background-color: #0056b3;
+}
+
+/* === ステータスメッセージ === */
+.fp-status {
+    margin-top: 1em;
+    font-size: 0.9em;
+    color: #333;
+}
+
+/* === エラーメッセージ === */
+.fp-error {
+    color: red;
+    font-size: 0.9em;
+}
+
+.fp-error-input {
+    border-color: red;
+    background-color: #ffe6e6;
+}
+
+/* === ラジオボタン === */
+.fp-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.fp-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    cursor: pointer;
+}
+
+.fp-radio {
+    margin: 0;
 }
 
 .fp-status {
     margin-top: 1em;
-    font-size: 0.9em;
+    font-size: 0.95em;
+    padding: 0.75em 1em;
+    border-radius: 6px;
+    transition: opacity 0.3s ease;
+    opacity: 1;
+}
+
+/* 成功時 */
+.fp-status-success {
+    background-color: #e6f6ea;
+    color: #1b5e20;
+    border: 1px solid #b9e4c9;
+}
+
+/* 失敗・エラー時 */
+.fp-status-error {
+    background-color: #ffe6e6;
+    color: #a30000;
+    border: 1px solid #ffcccc;
 }

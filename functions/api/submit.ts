@@ -1,18 +1,13 @@
-export async function onRequest(context: any): Promise<Response> {
-    const request = context.request;
-
+export async function onRequest({ request }: { request: Request }): Promise<Response> {
     const corsHeaders = {
-        "Access-Control-Allow-Origin": "*", // セキュリティ強化するなら特定ドメインに限定
+        "Access-Control-Allow-Origin": "*", // 必要に応じてオリジン制限
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // CORS プリフライト対応
+    // OPTIONSプリフライト対応
     if (request.method === "OPTIONS") {
-        return new Response(null, {
-            status: 204,
-            headers: corsHeaders,
-        });
+        return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     if (request.method !== "POST") {
@@ -22,7 +17,7 @@ export async function onRequest(context: any): Promise<Response> {
         });
     }
 
-    let body;
+    let body: Record<string, any>;
     try {
         body = await request.json();
     } catch {
@@ -32,17 +27,18 @@ export async function onRequest(context: any): Promise<Response> {
         });
     }
 
-    const { name, email, message, lp_code } = body;
-
-    if (!name || !email || !message) {
-        return new Response(JSON.stringify({ error: "Missing required fields" }), {
+    // 任意の必須項目（lp_code 以外）
+    if (!body.lp_code) {
+        return new Response(JSON.stringify({ error: "Missing lp_code" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
         });
     }
 
-    // ここでログ記録やバリデーション、SES連携などを今後追加
-    console.log(`[FormPlant] from ${lp_code}:`, { name, email, message });
+    // 任意ログ出力（LP識別・送信内容）
+    console.log(`[FormPlant] Submission from "${body.lp_code}":`, JSON.stringify(body));
+
+    // この先に AWS SES などの送信処理を挿入可能
 
     return new Response(JSON.stringify({ success: true }), {
         status: 200,

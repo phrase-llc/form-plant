@@ -1,0 +1,91 @@
+{
+  "messages": {
+    "success": "お問い合わせを受け付けました。ありがとうございます！",
+    "error": "送信に失敗しました。再度お試しください。",
+    "validation": "入力内容に誤りがあります。確認してください。"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "label": "お名前",
+      "type": "text",
+      "required": true,
+      "validation": {
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    {
+      "name": "email",
+      "label": "メールアドレス",
+      "type": "email",
+      "required": true,
+      "validation": {
+        "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+        "message": "正しいメールアドレスを入力してください",
+        "minLength": 5,
+        "maxLength": 256
+      }
+    },
+    {
+      "name": "message",
+      "label": "お問い合わせ内容",
+      "type": "textarea",
+      "required": true,
+      "validation": {
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    {
+      "name": "contact_reason",
+      "label": "お問い合わせ種別",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "",
+          "label": "選択してください"
+        },
+        {
+          "value": "support",
+          "label": "サポート"
+        },
+        {
+          "value": "sales",
+          "label": "導入相談"
+        },
+        {
+          "value": "other",
+          "label": "その他"
+        }
+      ]
+    },
+    {
+      "name": "plan",
+      "label": "プランを選択してください",
+      "type": "radio",
+      "required": true,
+      "options": [
+        {
+          "value": "free",
+          "label": "無料プラン"
+        },
+        {
+          "value": "pro",
+          "label": "プロプラン"
+        },
+        {
+          "value": "enterprise",
+          "label": "エンタープライズ"
+        }
+      ]
+    },
+    {
+      "name": "agree",
+      "label": "プライバシーポリシーに同意します",
+      "type": "checkbox",
+      "required": true
+    }
+  ]
+}
