@@ -9,5 +9,8 @@
   "devDependencies": {
     "typescript": "^5.8.3",
     "wrangler": "^4.14.4"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.806.0"
   }
 }

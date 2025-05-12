@@ -1,0 +1,11 @@
+name = "form-plant"
+compatibility_date = "2024-05-11"
+
+pages_build_output_dir = "./public"
+
+[vars]
+AWS_REGION = "ap-northeast-1"
+AWS_ACCESS_KEY_ID="******"
+AWS_SECRET_ACCESS_KEY="******"
+SES_FROM_ADDRESS="from@example.com"
+SES_TO_ADDRESS="to@example.com"

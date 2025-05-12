@@ -1,11 +1,12 @@
-export async function onRequest({ request }: { request: Request }): Promise<Response> {
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+
+export async function onRequest({ request, env }: { request: Request; env: Record<string, string> }): Promise<Response> {
     const corsHeaders = {
-        "Access-Control-Allow-Origin": "*", // 必要に応じてオリジン制限
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // OPTIONSプリフライト対応
     if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: corsHeaders });
     }
@@ -27,7 +28,6 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
         });
     }
 
-    // 任意の必須項目（lp_code 以外）
     if (!body.lp_code) {
         return new Response(JSON.stringify({ error: "Missing lp_code" }), {
             status: 400,
@@ -35,13 +35,45 @@ export async function onRequest({ request }: { request: Request }): Promise<Resp
         });
     }
 
-    // 任意ログ出力（LP識別・送信内容）
-    console.log(`[FormPlant] Submission from "${body.lp_code}":`, JSON.stringify(body));
+    const lpCode = body.lp_code;
+    const textBody = Object.entries(body)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join("\n");
 
-    // この先に AWS SES などの送信処理を挿入可能
+    const subject = `【FormPlant】お問い合わせ from ${lpCode}`;
 
-    return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+    const client = new SESClient({
+        region: env.AWS_REGION,
+        credentials: {
+            accessKeyId: env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        },
     });
+
+    const command = new SendEmailCommand({
+        Source: env.SES_FROM_ADDRESS,
+        Destination: {
+            ToAddresses: [env.SES_TO_ADDRESS],
+        },
+        Message: {
+            Subject: { Data: subject },
+            Body: {
+                Text: { Data: textBody },
+            },
+        },
+    });
+
+    try {
+        await client.send(command);
+        return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+    } catch (error: any) {
+        console.error("SES send error:", error);
+        return new Response(JSON.stringify({ error: error.message || "SES送信に失敗しました" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+    }
 }
