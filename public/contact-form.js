@@ -17,13 +17,15 @@
     const res = await fetch(formUrl);
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
-    formDef = json.fields || json; // fallback for legacy format
+    formDef = json.fields || json;
     if (json.messages) messages = { ...messages, ...json.messages };
   } catch (err) {
     container.innerHTML = `<div class="fp-error">フォーム定義の読み込みに失敗しました。</div>`;
     console.error(err);
     return;
   }
+
+  if (formDef.some(f => f.type === "turnstile")) loadTurnstileScript();
 
   const form = document.createElement("form");
   form.id = "fp-form";
@@ -57,6 +59,7 @@
     let hasError = false;
 
     for (const field of formDef) {
+      if (field.type === "turnstile") continue;
       const el = form.elements[field.name];
       if (!el) continue;
       const value = field.type === "checkbox" ? el.checked : el.value;
@@ -69,6 +72,9 @@
       }
       payload[field.name] = value;
     }
+
+    const turnstileToken = form.elements["cf-turnstile-response"]?.value;
+    if (turnstileToken) payload["cf-turnstile-response"] = turnstileToken;
 
     if (hasError) {
       if (!statusDiv.textContent) {
@@ -146,6 +152,17 @@
     if (!field.name || !field.type) return null;
     const wrapper = document.createElement("div");
     wrapper.className = "fp-field";
+
+    if (field.type === "turnstile") {
+      const div = document.createElement("div");
+      div.className = "cf-turnstile";
+      div.setAttribute("data-sitekey", field.sitekey || "");
+      if (field.theme) {
+        div.setAttribute("data-theme", field.theme);
+      }
+      wrapper.appendChild(div);
+      return wrapper;
+    }
 
     if (field.type === "checkbox") {
       const label = document.createElement("label");
@@ -225,5 +242,15 @@
     wrapper.appendChild(label);
     wrapper.appendChild(input);
     return wrapper;
+  }
+
+  function loadTurnstileScript() {
+    if (!document.querySelector('script[src*="challenges.cloudflare.com"]')) {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
   }
 })();

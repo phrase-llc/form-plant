@@ -5,6 +5,7 @@
     "validation": "入力内容に誤りがあります。確認してください。"
   },
   "fields": [
+    { "type": "turnstile", "name": "cf-turnstile-response", "theme": "dark", "sitekey": "0x4AAAAAABc1GmYNb2fh8K_7" },
     {
       "name": "name",
       "label": "お名前",

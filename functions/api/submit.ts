@@ -1,6 +1,8 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-export async function onRequest({ request, env }: { request: Request; env: Record<string, string> }): Promise<Response> {
+export async function onRequest(
+    { request, env }: { request: Request; env: Record<string, string> }
+): Promise<Response> {
     const corsHeaders = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -28,6 +30,34 @@ export async function onRequest({ request, env }: { request: Request; env: Recor
         });
     }
 
+    // ✅ Turnstile トークン検証
+    const token = body["cf-turnstile-response"];
+    if (!token || !env.TURNSTILE_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: "Missing Turnstile verification" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+    }
+
+    const verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        body: new URLSearchParams({
+            secret: env.TURNSTILE_SECRET_KEY,
+            response: token,
+            remoteip: request.headers.get("CF-Connecting-IP") || "",
+        }),
+    });
+
+    const verifyResult = await verifyResp.json();
+    if (!verifyResult.success) {
+        console.warn("Turnstile verification failed:", verifyResult);
+        return new Response(JSON.stringify({ error: "Turnstile verification failed" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+    }
+
+    // ✅ LPコードチェック
     if (!body.lp_code) {
         return new Response(JSON.stringify({ error: "Missing lp_code" }), {
             status: 400,
@@ -37,6 +67,7 @@ export async function onRequest({ request, env }: { request: Request; env: Recor
 
     const lpCode = body.lp_code;
     const textBody = Object.entries(body)
+        .filter(([key]) => key !== "cf-turnstile-response")
         .map(([key, value]) => `${key}: ${value}`)
         .join("\n");
 
