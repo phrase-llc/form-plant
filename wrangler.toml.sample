@@ -10,4 +10,4 @@ AWS_SECRET_ACCESS_KEY="******"
 SES_FROM_ADDRESS="from@example.com"
 SES_TO_ADDRESS="to@example.com"
 TURNSTILE_SECRET_KEY="0x*******"
-
+ALLOWED_ORIGINS="http://localhost:8788"

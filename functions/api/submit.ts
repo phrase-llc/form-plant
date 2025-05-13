@@ -1,10 +1,19 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
+function isAllowedOrigin(origin: string | null, allowedList: string): boolean {
+    if (!origin) return false;
+    const allowed = allowedList.split(",").map((o) => o.trim());
+    return allowed.includes(origin);
+}
+
 export async function onRequest(
     { request, env }: { request: Request; env: Record<string, string> }
 ): Promise<Response> {
+    const origin = request.headers.get("Origin") || "";
+    const allowOrigin = isAllowedOrigin(origin, env.ALLOWED_ORIGINS || "") ? origin : "";
+
     const corsHeaders = {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": allowOrigin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     };
@@ -30,7 +39,6 @@ export async function onRequest(
         });
     }
 
-    // ✅ Turnstile トークン検証
     const token = body["cf-turnstile-response"];
     if (!token || !env.TURNSTILE_SECRET_KEY) {
         return new Response(JSON.stringify({ error: "Missing Turnstile verification" }), {
@@ -57,7 +65,6 @@ export async function onRequest(
         });
     }
 
-    // ✅ LPコードチェック
     if (!body.lp_code) {
         return new Response(JSON.stringify({ error: "Missing lp_code" }), {
             status: 400,
