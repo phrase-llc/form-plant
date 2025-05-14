@@ -1,4 +1,4 @@
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
 
 function isAllowedOrigin(origin: string | null, allowedList: string[]): boolean {
     return origin !== null && allowedList.includes(origin);
@@ -60,8 +60,7 @@ export async function onRequest(
     }
 
     const allowedOrigins: string[] = JSON.parse(originsRaw);
-    const allowOrigin = isAllowedOrigin(origin, allowedOrigins) ? origin : "";
-    corsHeaders["Access-Control-Allow-Origin"] = allowOrigin;
+    corsHeaders["Access-Control-Allow-Origin"] = isAllowedOrigin(origin, allowedOrigins) ? origin : "";
 
     // ✅ Turnstile トークン検証
     const token = body["cf-turnstile-response"];
