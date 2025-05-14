@@ -1,23 +1,23 @@
-import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
-
-function isAllowedOrigin(origin: string | null, allowedList: string[]): boolean {
-    return origin !== null && allowedList.includes(origin);
-}
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 export async function onRequest(
-    { request, env }: { request: Request; env: Record<string, any> }
+    { request, env }: { request: Request; env: Record<string, string> }
 ): Promise<Response> {
     const origin = request.headers.get("Origin") || "";
+    const allowedOrigins = (env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim());
+    const allowOrigin = allowedOrigins.includes(origin) ? origin : "";
 
-    // 初期ヘッダー（仮、あとで上書き）
     const corsHeaders = {
-        "Access-Control-Allow-Origin": "",
+        "Access-Control-Allow-Origin": allowOrigin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     };
 
     if (request.method === "OPTIONS") {
-        return new Response(null, { status: 204, headers: corsHeaders });
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders,
+        });
     }
 
     if (request.method !== "POST") {
@@ -37,35 +37,10 @@ export async function onRequest(
         });
     }
 
-    const lpCode = body.lp_code;
-
-    if (!lpCode) {
-        return new Response(JSON.stringify({ error: "Missing lp_code" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-    }
-
-    // 🔑 KVから origins と Turnstile 秘密キーを取得
-    const [originsRaw, turnstileSecret] = await Promise.all([
-        env.CORS.get(`formplant:${lpCode}:origins`),
-        env.CORS.get(`formplant:${lpCode}:turnstile`)
-    ]);
-
-    if (!originsRaw || !turnstileSecret) {
-        return new Response(JSON.stringify({ error: "Unknown lp_code or missing configuration" }), {
-            status: 403,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
-    }
-
-    const allowedOrigins: string[] = JSON.parse(originsRaw);
-    corsHeaders["Access-Control-Allow-Origin"] = isAllowedOrigin(origin, allowedOrigins) ? origin : "";
-
-    // ✅ Turnstile トークン検証
+    // ✅ Turnstile 検証
     const token = body["cf-turnstile-response"];
-    if (!token) {
-        return new Response(JSON.stringify({ error: "Missing Turnstile token" }), {
+    if (!token || !env.TURNSTILE_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: "Missing Turnstile verification" }), {
             status: 400,
             headers: { "Content-Type": "application/json", ...corsHeaders },
         });
@@ -74,7 +49,7 @@ export async function onRequest(
     const verifyResp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
         method: "POST",
         body: new URLSearchParams({
-            secret: turnstileSecret,
+            secret: env.TURNSTILE_SECRET_KEY,
             response: token,
             remoteip: request.headers.get("CF-Connecting-IP") || "",
         }),
@@ -89,7 +64,8 @@ export async function onRequest(
         });
     }
 
-    // ✅ メール本文生成
+    // ✅ メール送信
+    const lpCode = body.lp_code || "unknown";
     const textBody = Object.entries(body)
         .filter(([key]) => key !== "cf-turnstile-response")
         .map(([key, value]) => `${key}: ${value}`)
