@@ -84,8 +84,9 @@
       return;
     }
 
+    const apiUrl = scriptEl.getAttribute("data-api-url") || "https://form-plant.pages.dev/api/submit";
     try {
-      const res = await fetch("/api/submit", {
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
