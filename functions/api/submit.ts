@@ -1,16 +1,19 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-function isAllowedOrigin(origin: string | null, allowedList: string): boolean {
-    if (!origin) return false;
-    const allowed = allowedList.split(",").map((o) => o.trim());
-    return allowed.includes(origin);
+function isAllowedOrigin(origin: string | null, allowedList: string[]): boolean {
+    return origin !== null && allowedList.includes(origin);
 }
 
 export async function onRequest(
-    { request, env }: { request: Request; env: Record<string, string> }
+    { request, env }: { request: Request; env: Record<string, any> }
 ): Promise<Response> {
     const origin = request.headers.get("Origin") || "";
-    const allowOrigin = isAllowedOrigin(origin, env.ALLOWED_ORIGINS || "") ? origin : "";
+
+    // ✅ KVからオリジン一覧を取得
+    const raw = await env.CORS.get("allowed-origins");
+    const allowedList: string[] = raw ? JSON.parse(raw) : [];
+
+    const allowOrigin = isAllowedOrigin(origin, allowedList) ? origin : "";
 
     const corsHeaders = {
         "Access-Control-Allow-Origin": allowOrigin,
