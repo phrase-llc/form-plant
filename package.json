@@ -4,7 +4,8 @@
   "repository": "git@github.com:phrase-llc/form-plant.git",
   "license": "MIT",
   "scripts": {
-    "dev": "wrangler pages dev"
+    "dev": "wrangler pages dev",
+    "typecheck": "tsc"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
