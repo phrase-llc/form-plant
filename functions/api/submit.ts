@@ -1,4 +1,6 @@
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+// SESv2 (REST-JSON) を使う。classic SES は XML を返し、その応答解析が
+// @aws-sdk/xml-builder の browser 版（DOMParser 依存）に解決されて workerd で落ちる。
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 
 export async function onRequest(
     { request, env }: { request: Request; env: Record<string, string> }
@@ -73,7 +75,7 @@ export async function onRequest(
 
     const subject = `【FormPlant】お問い合わせ from ${lpCode}`;
 
-    const client = new SESClient({
+    const client = new SESv2Client({
         region: env.AWS_REGION,
         credentials: {
             accessKeyId: env.AWS_ACCESS_KEY_ID,
@@ -82,14 +84,16 @@ export async function onRequest(
     });
 
     const command = new SendEmailCommand({
-        Source: env.SES_FROM_ADDRESS,
+        FromEmailAddress: env.SES_FROM_ADDRESS,
         Destination: {
             ToAddresses: [env.SES_TO_ADDRESS],
         },
-        Message: {
-            Subject: { Data: subject },
-            Body: {
-                Text: { Data: textBody },
+        Content: {
+            Simple: {
+                Subject: { Data: subject, Charset: "UTF-8" },
+                Body: {
+                    Text: { Data: textBody, Charset: "UTF-8" },
+                },
             },
         },
     });
