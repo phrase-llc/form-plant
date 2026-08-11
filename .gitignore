@@ -138,3 +138,5 @@ dist
 # cloudflare pages
 wrangler.toml
 .wrangler
+# wrangler pages functions build の検査用出力（npm run check:bundle）
+.bundle-check

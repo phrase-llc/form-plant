@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "wrangler pages dev",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "check:bundle": "wrangler pages functions build --outdir=.bundle-check && node scripts/check-worker-bundle.mjs .bundle-check"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260808.1",
