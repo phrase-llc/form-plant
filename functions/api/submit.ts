@@ -55,7 +55,7 @@ export async function onRequest(
         }),
     });
 
-    const verifyResult = await verifyResp.json();
+    const verifyResult = await verifyResp.json<{ success: boolean; "error-codes"?: string[] }>();
     if (!verifyResult.success) {
         console.warn("Turnstile verification failed:", verifyResult);
         return new Response(JSON.stringify({ error: "Turnstile verification failed" }), {
