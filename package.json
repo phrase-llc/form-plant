@@ -13,6 +13,6 @@
     "wrangler": "^4.120.0"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1106.0"
+    "@aws-sdk/client-sesv2": "^3.1108.0"
   }
 }
