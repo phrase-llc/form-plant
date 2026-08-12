@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "wrangler pages dev",
+    "seed:local": "node scripts/seed-local-kv.mjs",
     "typecheck": "tsc",
     "check:bundle": "node scripts/check-worker-bundle.mjs",
     "check:client": "node --check public/contact-form.js && node -e \"JSON.parse(require('fs').readFileSync('public/test.json','utf8'))\""

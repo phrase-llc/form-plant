@@ -8,8 +8,13 @@
 
   // 送信先の既定はこのスクリプトの配信元にする。LP 側に URL を持たせない。
   // data-api-url は明示指定したいときの上書き。
-  const apiBase = scriptEl.getAttribute("data-api-url")
-    || new URL(scriptEl.src, location.href).origin + "/api/submit";
+  // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
+  const apiBase = (scriptEl.getAttribute("data-api-url")
+    || new URL(scriptEl.src, location.href).origin + "/api/submit").replace(/\/+$/, "");
+
+  // 定義側が maxLength を書いていないフィールドにも効く絶対上限。
+  // サーバ側の MAX_FIELD_LENGTH と揃える。
+  const MAX_FIELD_LENGTH = 8000;
 
   let formDef = [];
   let formSlug = null;
@@ -23,12 +28,24 @@
     const res = await fetch(formUrl);
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
-    formDef = json.fields || json;
+    // `fields` を持つオブジェクトか、フィールドの配列そのものを受ける。
+    // どちらでもなければ描画に進まない。オブジェクトを代入してしまうと、
+    // この try の外で配列メソッドが投げてフォームが無言で消える。
+    formDef = Array.isArray(json.fields) ? json.fields : (Array.isArray(json) ? json : null);
+    if (!formDef) throw new Error("フォーム定義に fields がありません");
     formSlug = json.slug || null;
     if (json.messages) messages = { ...messages, ...json.messages };
   } catch (err) {
     container.innerHTML = `<div class="fp-error">フォーム定義の読み込みに失敗しました。</div>`;
     console.error(err);
+    return;
+  }
+
+  // 送信先が組めないなら描画もしない。送信時に気付く形にすると、
+  // 全項目を入力して Turnstile を解いた後で失敗し、入力内容が失われる。
+  if (!siteKey || !formSlug) {
+    container.innerHTML = `<div class="fp-error">フォームの設定が不足しています。</div>`;
+    console.error("data-site-key またはフォーム定義の slug がありません");
     return;
   }
 
@@ -93,13 +110,6 @@
       return;
     }
 
-    if (!siteKey || !formSlug) {
-      statusDiv.textContent = messages.error;
-      statusDiv.classList.add("fp-status-error");
-      console.error("data-site-key またはフォーム定義の slug がありません");
-      return;
-    }
-
     const apiUrl = `${apiBase}/${encodeURIComponent(siteKey)}/${encodeURIComponent(formSlug)}`;
 
     // 連打すると同じ内容のメールが複数届く。送信中はボタンを止める。
@@ -113,12 +123,17 @@
 
       if (res.ok) {
         form.reset();
+        // form.reset() は Turnstile ウィジェットを戻さない。トークンは単回使用なので、
+        // ここでリセットしないと2回目の送信が必ずトークン無しで失敗する。
+        window.turnstile?.reset();
         statusDiv.textContent = messages.success;
         statusDiv.classList.remove("fp-status-error");
         statusDiv.classList.add("fp-status-success");
       } else {
-        const data = await res.json().catch(() => null);
-        statusDiv.textContent = data?.error || messages.error;
+        // サーバのエラー文には SES など内部の事情が混じることがある。
+        // 画面に出すのは、保存された定義から出た検証エラーの詳細だけに限る。
+        const data = res.status === 422 ? await res.json().catch(() => null) : null;
+        statusDiv.textContent = data?.details?.[0] || messages.error;
         statusDiv.classList.add("fp-status-error");
       }
     } catch (err) {
@@ -141,21 +156,101 @@
     }
 
     if (typeof value === "string") {
-      if (field.validation?.pattern) {
-        const regex = new RegExp(field.validation.pattern);
-        if (!regex.test(value)) {
-          return field.validation.message || `${field.label} の形式が正しくありません`;
+      const rules = field.validation || {};
+
+      // 長さの検査を先に済ませる。パターンを先に走らせると、マッチしない長い入力で
+      // 破滅的バックトラッキングが起きる。ブラウザには CPU 制限が無いので、
+      // 訪問者のタブがそのまま固まる。
+      if (value.length > MAX_FIELD_LENGTH) {
+        return `${field.label} は最大 ${MAX_FIELD_LENGTH} 文字です`;
+      }
+      if (rules.maxLength && value.length > rules.maxLength) {
+        return rules.message || `${field.label} は最大 ${rules.maxLength} 文字です`;
+      }
+      if (rules.minLength && value.length < rules.minLength) {
+        return rules.message || `${field.label} は最低 ${rules.minLength} 文字です`;
+      }
+
+      if (rules.pattern && !unsafePattern(rules.pattern)) {
+        // サーバ側と同じ完全一致にする（HTML の pattern 属性と同じ意味）。
+        // アンカー無しのままだと、部分一致で通ってしまう。
+        let regex = null;
+        try {
+          regex = new RegExp(`^(?:${rules.pattern})$`);
+        } catch (err) {
+          console.error(`フィールド ${field.name} の pattern が不正です`, err);
         }
-      }
-      if (field.validation?.minLength && value.length < field.validation.minLength) {
-        return field.validation.message || `${field.label} は最低 ${field.validation.minLength} 文字です`;
-      }
-      if (field.validation?.maxLength && value.length > field.validation.maxLength) {
-        return field.validation.message || `${field.label} は最大 ${field.validation.maxLength} 文字です`;
+        if (regex && !regex.test(value)) {
+          return rules.message || `${field.label} の形式が正しくありません`;
+        }
       }
     }
 
     return null;
+  }
+
+  // 定義側の正規表現が破滅的バックトラッキングを起こしうるかを見る。
+  //
+  // ブラウザには CPU 制限が無いので、踏むと訪問者のタブがそのまま固まる。
+  // 危険と見たパターンは検証せずに飛ばし、サーバ側の判定に委ねる
+  // （サーバは同じパターンを設定不備として 500 で弾く）。
+  //
+  // 判定ではなく検知の試みである。量指定子を含むグループに上限の無い量指定子が
+  // さらに付いている形だけを弾き、選択肢の重なり（`(a|a)*`）は検知できない。
+  //
+  // functions/api/submit/[site]/[slug].ts に同じ判定がある。このスクリプトは
+  // ビルド無しの素のスクリプトなので共有できない。片方だけ直すと、もう片方で固まる。
+  function unsafePattern(source) {
+    const enclosing = [];
+    let quantifierInScope = false;
+    let inClass = false;
+
+    for (let i = 0; i < source.length; i++) {
+      const c = source[i];
+
+      if (c === "\\") { i++; continue; }
+      if (inClass) { if (c === "]") inClass = false; continue; }
+
+      if (c === "[") { inClass = true; continue; }
+
+      if (c === "(") {
+        enclosing.push(quantifierInScope);
+        quantifierInScope = false;
+        continue;
+      }
+
+      if (c === ")") {
+        const bodyHadQuantifier = quantifierInScope;
+        // 入れ子のグループの中で見た量指定子も、外側から見れば「中にある」ことになる。
+        // 伝播させないと `((a+))+` を見逃す。
+        quantifierInScope = (enclosing.pop() ?? false) || bodyHadQuantifier;
+        const quantifier = quantifierAt(source, i + 1);
+        if (quantifier === "open" && bodyHadQuantifier) return true;
+        if (quantifier !== "none") quantifierInScope = true;
+        continue;
+      }
+
+      if (c === "*" || c === "+") { quantifierInScope = true; continue; }
+      if (c === "{" && quantifierAt(source, i) !== "none") { quantifierInScope = true; continue; }
+    }
+
+    return false;
+  }
+
+  // 上限の無い量指定子（`*` `+` `{n,}`）を open とする。
+  // 上限があれば繰り返しは有限なので、組み合わせは多項式にとどまる。
+  function quantifierAt(source, i) {
+    const c = source[i];
+    if (c === "*" || c === "+") return "open";
+    if (c === "?") return "bounded";
+    if (c !== "{") return "none";
+
+    const end = source.indexOf("}", i);
+    if (end === -1) return "none";
+
+    const body = source.slice(i + 1, end);
+    if (body === "" || !/^\d*(,\d*)?$/.test(body)) return "none";
+    return body.endsWith(",") ? "open" : "bounded";
   }
 
   function showError(el, message) {
