@@ -8,7 +8,7 @@ name: CI
 #   1. npm test            — 送信値の検証ロジック（functions/_lib/definition.ts）
 #   2. npm run typecheck   — functions/ の型
 #   3. npm run check:bundle — workerd に無い API がバンドルに混入していないか
-#   4. npm run check:client — public/contact-form.js の構文と test.json の妥当性
+#   4. npm run check:client — public/contact-form.js の構文とフォーム定義 JSON の妥当性
 #
 # 2 が要るのは、型チェックとバンドルの両方を通ったコードが実行時に落ちた実例が
 # あるため。@aws-sdk/client-ses の更新で browser 版 XML パーサ（DOMParser 依存）が

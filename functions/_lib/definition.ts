@@ -1,16 +1,15 @@
-// KV に置かれたサイト設定とフォーム定義の契約、および定義に基づく検証。
+// フォーム定義の形と、定義に基づく送信値の検証。
 //
-// 送信の受付と定義の配信の両方がこれを読む。バージョンと型をルートごとに持つと、
-// 片方だけ上げたときに「配信は新スキーマ、送信は 500」という最も気付きにくい
-// 壊れ方をするので、1箇所に置く。
+// 定義そのものは `public/forms/*.json` にあり、2つの経路で使われる。
+// ウィジェットは静的配信されたものを fetch して描画に使い、送信の受付は
+// 同じファイルを import してバンドルしたものを検証に使う。
+// 1つのファイルなので、描画と検証がずれることがない。
 //
-// この定数は console 側の `SiteProjection::SCHEMA_VERSION` と対になっている。
-// 形を変えるときは3点（配信・受付・console）を揃える。
+// スキーマのバージョン番号は持たない。定義はコードと同じデプロイに乗るので、
+// 両者が食い違う状態が作れない。実行時に設定を書き換える経路が無いことの利点である。
 //
 // なお `functions/` 配下にあってもリクエストハンドラを export しないファイルは
 // ルートにならない（`/_lib/definition` は 404）。実測で確認している。
-
-export const SUPPORTED_SCHEMA_VERSION = 1;
 
 // 定義側が maxLength を書いていないフィールドにも効く絶対上限。
 // メール本文の総量を抑えるためのもの。正規表現の実行時間の対策にはならない
@@ -30,17 +29,13 @@ export type FieldDefinition = {
     validation?: { pattern?: string; minLength?: number; maxLength?: number; message?: string };
 };
 
-export type FormDefinition = { v: number; fields: FieldDefinition[] };
-
-// ingest だけが読む。公開レスポンスには載らない。
-export type SiteConfig = {
-    v: number;
-    label: string;
-    allowed_origins: string[];
-    turnstile_secret: string;
-    mail_from: string;
-    mail_to: string;
-    forms: string[];
+export type FormDefinition = {
+    // ウィジェットが送信先のパスを組むのに使う。
+    slug: string;
+    // メールの件名に入る表示名。このファイルは静的配信されるので、秘密は置かない。
+    label?: string;
+    messages?: Record<string, string>;
+    fields: FieldDefinition[];
 };
 
 export type CompileResult =
@@ -52,8 +47,8 @@ export type CompileResult =
 // 検証されていないフィールドがあることに誰も気付かない。
 //
 // 正規表現が破滅的バックトラッキングを起こさないかは、ここでは見ない。
-// KV に書くのは console だけなので、その検証は console の保存時に置く。
-// 読み出し側で弾くと、訪問者に 500 が出るだけで、書いた本人には届かない。
+// 定義を書くのはこのリポジトリにコミットする人なので、検証は書く側に置く。
+// 実行時に弾いても、訪問者に 500 が出るだけで、書いた本人には届かない。
 export function compilePatterns(fields: FieldDefinition[]): CompileResult {
     const patterns = new Map<string, RegExp>();
 

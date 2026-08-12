@@ -1,11 +1,18 @@
 {
+  "slug": "contact",
+  "label": "phrase-inc.com",
   "messages": {
     "success": "お問い合わせを受け付けました。ありがとうございます！",
     "error": "送信に失敗しました。再度お試しください。",
     "validation": "入力内容に誤りがあります。確認してください。"
   },
   "fields": [
-    { "type": "turnstile", "name": "cf-turnstile-response", "theme": "dark", "sitekey": "1x00000000000000000000AA" },
+    {
+      "type": "turnstile",
+      "name": "cf-turnstile-response",
+      "theme": "dark",
+      "sitekey": "1x00000000000000000000AA"
+    },
     {
       "name": "name",
       "label": "お名前",

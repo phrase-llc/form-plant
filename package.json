@@ -6,10 +6,9 @@
   "scripts": {
     "dev": "wrangler pages dev",
     "test": "node --test \"test/**/*.test.ts\"",
-    "seed:local": "node scripts/seed-local-kv.mjs",
     "typecheck": "tsc",
     "check:bundle": "node scripts/check-worker-bundle.mjs",
-    "check:client": "node --check public/contact-form.js && node -e \"JSON.parse(require('fs').readFileSync('public/test.json','utf8'))\""
+    "check:client": "node --check public/contact-form.js && node -e \"JSON.parse(require('fs').readFileSync('public/forms/contact.json','utf8'))\""
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260808.1",

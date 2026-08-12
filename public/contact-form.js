@@ -4,7 +4,6 @@
 
   const scriptEl = document.currentScript;
   const formUrl = scriptEl.getAttribute("data-form-url");
-  const siteKey = scriptEl.getAttribute("data-site-key");
 
   // 送信先の既定はこのスクリプトの配信元にする。LP 側に URL を持たせない。
   // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
@@ -41,9 +40,9 @@
 
   // 送信先が組めないなら描画もしない。送信時に気付く形にすると、
   // 全項目を入力して Turnstile を解いた後で失敗し、入力内容が失われる。
-  if (!siteKey || !formSlug) {
+  if (!formSlug) {
     container.innerHTML = `<div class="fp-error">フォームの設定が不足しています。</div>`;
-    console.error("data-site-key またはフォーム定義の slug がありません");
+    console.error("フォーム定義に slug がありません");
     return;
   }
 
@@ -106,7 +105,7 @@
       return;
     }
 
-    const apiUrl = `${apiBase}/${encodeURIComponent(siteKey)}/${encodeURIComponent(formSlug)}`;
+    const apiUrl = `${apiBase}/${encodeURIComponent(formSlug)}`;
 
     // 連打すると同じ内容のメールが複数届く。送信中はボタンを止める。
     submit.disabled = true;
