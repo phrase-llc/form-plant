@@ -3,15 +3,11 @@
 // console が KV に投影した `form:<site_key>:<slug>` を返す。
 // このレスポンスは公開なので、secret を含むレコード（`site:<site_key>`）は
 // 絶対に読まない。キーを2種類に分けているのはそのためである。
-//
-// 取得は LP のページビューごとに発生する。送信の回数ではなくページビューに
-// 比例するので、この経路が最もトラフィックが多い。キャッシュを効かせる。
-
-// console 側の SiteProjection::SCHEMA_VERSION と対応する。
-// 知らないバージョンは黙って通さず、明示的に失敗させる。
-const SUPPORTED_SCHEMA_VERSION = 1;
+import { SUPPORTED_SCHEMA_VERSION } from "../../../_lib/definition";
+import { first, json } from "../../../_lib/http";
 
 // console で定義を編集してから反映されるまでの最大の遅れ。
+// キャッシュを効かせる理由は CLAUDE.md（この経路が最もトラフィックが多い）。
 const CACHE_MAX_AGE_SECONDS = 60;
 
 // レスポンスに載せるキーはここで列挙し、レコードを丸ごと返さない。
@@ -93,15 +89,4 @@ export async function onRequest(
         console.error("unhandled error in form handler:", error);
         return json({ error: "Form definition is unavailable" }, 500, corsHeaders);
     }
-}
-
-function first(value: string | string[] | undefined): string | undefined {
-    return Array.isArray(value) ? value[0] : value;
-}
-
-function json(body: unknown, status: number, headers: Record<string, string>): Response {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: { ...headers, "Content-Type": "application/json; charset=utf-8" },
-    });
 }

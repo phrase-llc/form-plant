@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "wrangler pages dev",
+    "test": "node --test \"test/**/*.test.ts\"",
     "seed:local": "node scripts/seed-local-kv.mjs",
     "typecheck": "tsc",
     "check:bundle": "node scripts/check-worker-bundle.mjs",
@@ -17,5 +18,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1108.0"
-  }
+  },
+  "type": "module"
 }

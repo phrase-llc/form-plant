@@ -5,7 +5,11 @@
 // ローカルのテストページが唯一の検証手段なので、投入する手段を同梱しておく。
 //
 // フィールド定義は public/test.json をそのまま使う。定義の参照実装を1箇所に保つため、
-// ここで足すのは `v` と `slug` だけにする（console 側の SiteProjection と同じ扱い）。
+// ここで足すのは `v` と `slug` だけにする。
+//
+// この2つは定義側に書かせない。console 側の SiteProjection::RESERVED_DEFINITION_KEYS と
+// 同じ扱いで、定義が申告したものは落としてから投影する。`v` を定義に書けると
+// スキーマバージョンを名乗れてしまい、`slug` はウィジェットが送信先のパスを組む値である。
 
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -20,7 +24,10 @@ const SCHEMA_VERSION = 1;
 // public/test.json 側のテスト用 sitekey（1x00000000000000000000AA）と対になる。
 const TEST_TURNSTILE_SECRET = "1x0000000000000000000000000000000AA";
 
+const RESERVED_DEFINITION_KEYS = [ "v", "slug" ];
+
 const definition = JSON.parse(readFileSync("public/test.json", "utf8"));
+for (const key of RESERVED_DEFINITION_KEYS) delete definition[key];
 
 const siteRecord = {
     v: SCHEMA_VERSION,

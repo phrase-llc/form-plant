@@ -11,6 +11,7 @@ FormPlant is an embeddable contact-form widget for landing pages, hosted on Clou
 ```bash
 npm install
 npm run dev            # wrangler pages dev — serves ./public + ./functions at http://localhost:8788
+npm test               # node --test — the submission-validation logic in functions/_lib/
 npm run typecheck      # tsc — typecheck functions/ (no build step; Wrangler bundles TS directly)
 npm run check:bundle   # build the Functions bundle and reject workerd-incompatible APIs
 npm run check:client   # syntax-check public/contact-form.js and validate public/test.json
@@ -20,7 +21,9 @@ npx wrangler pages deploy   # deploy
 
 Local test page: `http://localhost:8788/test.html`. It fetches its definition from `/api/form/fp_localtest/contact` the way a real embed does, so **`npm run seed:local` is a prerequisite** — with an empty KV the page renders nothing but an error. The seed script builds both records from `public/test.json` and uses the Turnstile always-pass test pair (sitekey `1x00000000000000000000AA` in `test.json`, the matching test secret in the script).
 
-There is no test suite, linter, or formatter configured. CI (`.github/workflows/ci.yml`) runs the three `npm run` checks above on every PR; beyond that, verification is a manual pass over the local test page. Node version is pinned by `.node-version` (26.7.0, currently not an LTS line) and CI reads that file, so a version that cannot be installed fails the build.
+There is no linter or formatter configured. Tests cover one thing — `functions/_lib/definition.ts`, the submission-validation boundary — because the other three checks are all incapable of noticing that logic regressing. Everything else is verified by a manual pass over the local test page. CI (`.github/workflows/ci.yml`) runs all four checks on every PR. Node version is pinned by `.node-version` (26.7.0, currently not an LTS line) and CI reads that file, so a version that cannot be installed fails the build.
+
+The test runner is Node's built-in `node --test`, with no added dependency: Node strips the type annotations and runs the `.ts` files directly. `test/` is deliberately **outside** `tsconfig.json`'s `include` — typing the test file needs `@types/node`, and putting `node` in `types` would also let `process` and `Buffer` typecheck inside `functions/`, which is the same mistake as adding `DOM` back. The tests self-check by running, so they do not need the type net.
 
 `check:bundle` exists because a dependency upgrade once shipped code that typechecked *and* bundled cleanly but died at runtime: the AWS SDK's browser-conditioned XML parser pulled in `DOMParser`, which workerd lacks. It scans the built bundle for such APIs and also fails on Wrangler's own `nodejs_compat` warning. See the header of `scripts/check-worker-bundle.mjs` before adding patterns — some obvious ones (`Buffer`, `window`) match guarded feature detection in the AWS SDK and will fail spuriously.
 
@@ -50,7 +53,7 @@ The widget does **not** take the form slug as an attribute: it reads `slug` from
 
 It renders into `#contact-form` on the host page and does nothing if that element is absent.
 
-**Form definition JSON** (`public/test.json` is kept as a schema reference; `test.html` now fetches its definition from KV like a real embed does) drives everything: `{ messages?, fields[] }`, or a bare array of fields. Each field has `name`, `label`, `type` (`text`/`email`/`textarea`/`select`/`radio`/`checkbox`/`turnstile` — anything else falls through to an `<input>` of that type), optional `required`, `options[]` for select/radio, and `validation` (`pattern`, `minLength`, `maxLength`, `message`). Adding a field type means touching `renderField()` and, if its value isn't read off `form.elements[name].value`, the submit handler and `validateField()` too.
+**Form definition JSON** drives everything. `public/test.json` is the reference for the *field* part of a definition and is what `npm run seed:local` projects into KV; `v` and `slug` are not in it and must not be, because those are supplied by whatever writes the record (the console's `SiteProjection`, or the seed script, both of which strip them from the definition first). A definition served to the widget is `{ v, slug, messages?, fields[] }` — a bare array of fields is no longer accepted, since it has nowhere to carry `slug` and the widget cannot build a submit URL without it. Each field has `name`, `label`, `type` (`text`/`email`/`textarea`/`select`/`radio`/`checkbox`/`turnstile` — anything else falls through to an `<input>` of that type), optional `required`, `options[]` for select/radio, and `validation` (`pattern`, `minLength`, `maxLength`, `message`). Adding a field type means touching `renderField()` and, if its value isn't read off `form.elements[name].value`, the submit handler and `validateField()` too.
 
 A `turnstile` field is special-cased: it injects the Cloudflare Turnstile script, renders a `.cf-turnstile` div with the field's `sitekey`, and is skipped by the payload/validation loop — the token is picked up separately from the widget-injected `cf-turnstile-response` input.
 
@@ -60,7 +63,9 @@ A `turnstile` field is special-cased: it injects the Cloudflare Turnstile script
 
 Repointing the landing pages does not by itself reduce anything. While `/api/submit` answers, one Turnstile token against the global `TURNSTILE_SECRET_KEY` still buys arbitrary mail content from the verified domain, and both routes send under the same SES identity, so the guarantees the KV path adds are only as good as the day the old route is deleted. It also means a site disabled in the console keeps working through the old route. Deleting it is the milestone, not the migration.
 
-**`site_key` sits in the path rather than the body, and that is forced by CORS.** A preflight `OPTIONS` carries no body, so a body-borne site key leaves you unable to decide which origin to allow at preflight time.
+**`site_key` sits in the path rather than the body, and CORS forces that.** The reason is in the header comment of the submit function, where someone about to change the route shape will actually read it.
+
+Code shared by the routes lives in `functions/_lib/`. `definition.ts` holds the KV contract — `SUPPORTED_SCHEMA_VERSION`, the field types, validation, and mail-body assembly — because a version constant duplicated per route produces the worst failure available here: bump one side and the definition endpoint serves the new schema while submissions 500. The `_` prefix does nothing for routing (verified: `functions/_lib/probe.ts` exporting `onRequest` *was* served at `/_lib/probe`); what keeps these files off the URL space is that they export no request handler, which makes Pages answer 404.
 
 Configuration comes from two KV records, split so that the public endpoint never reads the one holding secrets:
 

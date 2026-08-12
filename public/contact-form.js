@@ -7,10 +7,9 @@
   const siteKey = scriptEl.getAttribute("data-site-key");
 
   // 送信先の既定はこのスクリプトの配信元にする。LP 側に URL を持たせない。
-  // data-api-url は明示指定したいときの上書き。
   // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
   const apiBase = (scriptEl.getAttribute("data-api-url")
-    || new URL(scriptEl.src, location.href).origin + "/api/submit").replace(/\/+$/, "");
+    || new URL(scriptEl.src).origin + "/api/submit").replace(/\/+$/, "");
 
   // 定義側が maxLength を書いていないフィールドにも効く絶対上限。
   // サーバ側の MAX_FIELD_LENGTH と揃える。
@@ -28,12 +27,11 @@
     const res = await fetch(formUrl);
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
-    // `fields` を持つオブジェクトか、フィールドの配列そのものを受ける。
-    // どちらでもなければ描画に進まない。オブジェクトを代入してしまうと、
+    // fields が配列でなければ描画に進まない。オブジェクトを代入してしまうと、
     // この try の外で配列メソッドが投げてフォームが無言で消える。
-    formDef = Array.isArray(json.fields) ? json.fields : (Array.isArray(json) ? json : null);
-    if (!formDef) throw new Error("フォーム定義に fields がありません");
-    formSlug = json.slug || null;
+    if (!Array.isArray(json.fields)) throw new Error("フォーム定義に fields がありません");
+    formDef = json.fields;
+    formSlug = json.slug;
     if (json.messages) messages = { ...messages, ...json.messages };
   } catch (err) {
     container.innerHTML = `<div class="fp-error">フォーム定義の読み込みに失敗しました。</div>`;
@@ -79,8 +77,6 @@
     statusDiv.className = "fp-status";
     clearErrors();
 
-    // 送信先はサーバが保持する設定から決まる。クライアントは
-    // どの設定を引くかだけを伝える（site_key と slug はパスに入る）。
     const payload = {};
     let hasError = false;
 

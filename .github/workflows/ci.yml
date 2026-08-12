@@ -1,21 +1,26 @@
 name: CI
 
-# このリポジトリにはテストスイートが無く、検証は型チェックとバンドル検査だけ。
-# どちらも数十秒で終わるので、phrase-llc-website のような gh signoff 運用は取らず
-# 全 PR で自動実行する。（あちらは Playwright が重いためローカル実行 + signoff）
+# 検証は軽い検査の集まりで、どれも数十秒で終わる。phrase-llc-website のような
+# gh signoff 運用は取らず、全 PR で自動実行する。（あちらは Playwright が重いため
+# ローカル実行 + signoff）
 #
-# 検査は3つ。
-#   1. npm run typecheck   — functions/ の型
-#   2. npm run check:bundle — workerd に無い API がバンドルに混入していないか
-#   3. npm run check:client — public/contact-form.js の構文と test.json の妥当性
+# 検査は4つ。
+#   1. npm test            — 送信値の検証ロジック（functions/_lib/definition.ts）
+#   2. npm run typecheck   — functions/ の型
+#   3. npm run check:bundle — workerd に無い API がバンドルに混入していないか
+#   4. npm run check:client — public/contact-form.js の構文と test.json の妥当性
 #
 # 2 が要るのは、型チェックとバンドルの両方を通ったコードが実行時に落ちた実例が
 # あるため。@aws-sdk/client-ses の更新で browser 版 XML パーサ（DOMParser 依存）が
 # 選ばれ、メール送信の応答解析だけが本番で失敗した。詳細は scripts/check-worker-bundle.mjs。
 #
-# 3 は tsconfig の include が functions のみで、埋め込み先 LP に配信される
+# 4 は tsconfig の include が functions のみで、埋め込み先 LP に配信される
 # public/contact-form.js が完全に無検査だったため。構文エラーがそのまま
 # 全 LP に配信される状態だったので、最低限の網をかけている。
+#
+# 1 が要るのは、2 も 3 も 4 も論理の退行を検出しないため。送信値の検証は
+# 検証済みドメインから出るメールの内容を他人に握らせないための境界であり、
+# ここが黙って緩んでも他の3つは緑のままになる。
 
 on:
   pull_request:
@@ -48,6 +53,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: 送信値の検証ロジックのテスト
+        run: npm test
 
       - name: typecheck
         run: npm run typecheck
