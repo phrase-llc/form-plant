@@ -12,12 +12,16 @@ FormPlant is an embeddable contact-form widget for landing pages, hosted on Clou
 npm install
 npm run dev            # wrangler pages dev — serves ./public + ./functions at http://localhost:8788
 npm run typecheck      # tsc — typecheck functions/ (no build step; Wrangler bundles TS directly)
+npm run check:bundle   # build the Functions bundle and reject workerd-incompatible APIs
+npm run check:client   # syntax-check public/contact-form.js and validate public/test.json
 npx wrangler pages deploy   # deploy
 ```
 
 Local test page: `http://localhost:8788/test.html` (uses `/test.json` as the form definition and the Turnstile always-pass test sitekey `1x00000000000000000000AA`).
 
-There is no test suite, linter, or formatter configured — `npm run typecheck` plus a manual pass over the local test page is the whole verification story. Node version is pinned by `.node-version` (26.7.0, currently not an LTS line).
+There is no test suite, linter, or formatter configured. CI (`.github/workflows/ci.yml`) runs the three `npm run` checks above on every PR; beyond that, verification is a manual pass over the local test page. Node version is pinned by `.node-version` (26.7.0, currently not an LTS line) and CI reads that file, so a version that cannot be installed fails the build.
+
+`check:bundle` exists because a dependency upgrade once shipped code that typechecked *and* bundled cleanly but died at runtime: the AWS SDK's browser-conditioned XML parser pulled in `DOMParser`, which workerd lacks. It scans the built bundle for such APIs and also fails on Wrangler's own `nodejs_compat` warning. See the header of `scripts/check-worker-bundle.mjs` before adding patterns — some obvious ones (`Buffer`, `window`) match guarded feature detection in the AWS SDK and will fail spuriously.
 
 ## Configuration
 

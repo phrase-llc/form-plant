@@ -1,0 +1,59 @@
+name: CI
+
+# このリポジトリにはテストスイートが無く、検証は型チェックとバンドル検査だけ。
+# どちらも数十秒で終わるので、phrase-llc-website のような gh signoff 運用は取らず
+# 全 PR で自動実行する。（あちらは Playwright が重いためローカル実行 + signoff）
+#
+# 検査は3つ。
+#   1. npm run typecheck   — functions/ の型
+#   2. npm run check:bundle — workerd に無い API がバンドルに混入していないか
+#   3. npm run check:client — public/contact-form.js の構文と test.json の妥当性
+#
+# 2 が要るのは、型チェックとバンドルの両方を通ったコードが実行時に落ちた実例が
+# あるため。@aws-sdk/client-ses の更新で browser 版 XML パーサ（DOMParser 依存）が
+# 選ばれ、メール送信の応答解析だけが本番で失敗した。詳細は scripts/check-worker-bundle.mjs。
+#
+# 3 は tsconfig の include が functions のみで、埋め込み先 LP に配信される
+# public/contact-form.js が完全に無検査だったため。構文エラーがそのまま
+# 全 LP に配信される状態だったので、最低限の網をかけている。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # PR の反復では古い run を打ち切ってよいが、main では打ち切らない。
+  # 連続マージ時にキャンセルされると、そのコミットが検査済みの記録を持たなくなる。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # node-version-file で .node-version を読む。ピンしたバージョンが実際に
+      # 取得できることの検証も兼ねる（ローカルは mise 任せで、素のシェルでは
+      # Homebrew の node が使われることがあるため）。
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: バンドルに workerd で動かない API が無いか検査
+        run: npm run check:bundle
+
+      - name: 配信するクライアント資産の検査
+        run: npm run check:client
