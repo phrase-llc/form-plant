@@ -4,9 +4,15 @@
 
   const scriptEl = document.currentScript;
   const formUrl = scriptEl.getAttribute("data-form-url");
-  const lpCode = scriptEl.getAttribute("data-lp") || "unknown";
+  const siteKey = scriptEl.getAttribute("data-site-key");
+
+  // 送信先の既定はこのスクリプトの配信元にする。LP 側に URL を持たせない。
+  // data-api-url は明示指定したいときの上書き。
+  const apiBase = scriptEl.getAttribute("data-api-url")
+    || new URL(scriptEl.src, location.href).origin + "/api/submit";
 
   let formDef = [];
+  let formSlug = null;
   let messages = {
     success: "送信が完了しました。ありがとうございます！",
     error: "送信に失敗しました。",
@@ -18,6 +24,7 @@
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
     formDef = json.fields || json;
+    formSlug = json.slug || null;
     if (json.messages) messages = { ...messages, ...json.messages };
   } catch (err) {
     container.innerHTML = `<div class="fp-error">フォーム定義の読み込みに失敗しました。</div>`;
@@ -55,7 +62,9 @@
     statusDiv.className = "fp-status";
     clearErrors();
 
-    const payload = { lp_code: lpCode };
+    // 送信先はサーバが保持する設定から決まる。クライアントは
+    // どの設定を引くかだけを伝える（site_key と slug はパスに入る）。
+    const payload = {};
     let hasError = false;
 
     for (const field of formDef) {
@@ -84,7 +93,17 @@
       return;
     }
 
-    const apiUrl = scriptEl.getAttribute("data-api-url") || "https://form-plant.pages.dev/api/submit";
+    if (!siteKey || !formSlug) {
+      statusDiv.textContent = messages.error;
+      statusDiv.classList.add("fp-status-error");
+      console.error("data-site-key またはフォーム定義の slug がありません");
+      return;
+    }
+
+    const apiUrl = `${apiBase}/${encodeURIComponent(siteKey)}/${encodeURIComponent(formSlug)}`;
+
+    // 連打すると同じ内容のメールが複数届く。送信中はボタンを止める。
+    submit.disabled = true;
     try {
       const res = await fetch(apiUrl, {
         method: "POST",
@@ -106,6 +125,8 @@
       console.error(err);
       statusDiv.textContent = messages.error;
       statusDiv.classList.add("fp-status-error");
+    } finally {
+      submit.disabled = false;
     }
   });
 
