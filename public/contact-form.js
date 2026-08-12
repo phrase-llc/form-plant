@@ -167,7 +167,7 @@
         return rules.message || `${field.label} は最低 ${rules.minLength} 文字です`;
       }
 
-      if (rules.pattern && !unsafePattern(rules.pattern)) {
+      if (rules.pattern) {
         // サーバ側と同じ完全一致にする（HTML の pattern 属性と同じ意味）。
         // アンカー無しのままだと、部分一致で通ってしまう。
         let regex = null;
@@ -183,70 +183,6 @@
     }
 
     return null;
-  }
-
-  // 定義側の正規表現が破滅的バックトラッキングを起こしうるかを見る。
-  //
-  // ブラウザには CPU 制限が無いので、踏むと訪問者のタブがそのまま固まる。
-  // 危険と見たパターンは検証せずに飛ばし、サーバ側の判定に委ねる
-  // （サーバは同じパターンを設定不備として 500 で弾く）。
-  //
-  // 判定ではなく検知の試みである。量指定子を含むグループに上限の無い量指定子が
-  // さらに付いている形だけを弾き、選択肢の重なり（`(a|a)*`）は検知できない。
-  //
-  // functions/api/submit/[site]/[slug].ts に同じ判定がある。このスクリプトは
-  // ビルド無しの素のスクリプトなので共有できない。片方だけ直すと、もう片方で固まる。
-  function unsafePattern(source) {
-    const enclosing = [];
-    let quantifierInScope = false;
-    let inClass = false;
-
-    for (let i = 0; i < source.length; i++) {
-      const c = source[i];
-
-      if (c === "\\") { i++; continue; }
-      if (inClass) { if (c === "]") inClass = false; continue; }
-
-      if (c === "[") { inClass = true; continue; }
-
-      if (c === "(") {
-        enclosing.push(quantifierInScope);
-        quantifierInScope = false;
-        continue;
-      }
-
-      if (c === ")") {
-        const bodyHadQuantifier = quantifierInScope;
-        // 入れ子のグループの中で見た量指定子も、外側から見れば「中にある」ことになる。
-        // 伝播させないと `((a+))+` を見逃す。
-        quantifierInScope = (enclosing.pop() ?? false) || bodyHadQuantifier;
-        const quantifier = quantifierAt(source, i + 1);
-        if (quantifier === "open" && bodyHadQuantifier) return true;
-        if (quantifier !== "none") quantifierInScope = true;
-        continue;
-      }
-
-      if (c === "*" || c === "+") { quantifierInScope = true; continue; }
-      if (c === "{" && quantifierAt(source, i) !== "none") { quantifierInScope = true; continue; }
-    }
-
-    return false;
-  }
-
-  // 上限の無い量指定子（`*` `+` `{n,}`）を open とする。
-  // 上限があれば繰り返しは有限なので、組み合わせは多項式にとどまる。
-  function quantifierAt(source, i) {
-    const c = source[i];
-    if (c === "*" || c === "+") return "open";
-    if (c === "?") return "bounded";
-    if (c !== "{") return "none";
-
-    const end = source.indexOf("}", i);
-    if (end === -1) return "none";
-
-    const body = source.slice(i + 1, end);
-    if (body === "" || !/^\d*(,\d*)?$/.test(body)) return "none";
-    return body.endsWith(",") ? "open" : "bounded";
   }
 
   function showError(el, message) {

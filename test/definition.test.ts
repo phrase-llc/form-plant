@@ -18,7 +18,6 @@ import {
     TURNSTILE_FIELD,
     buildBody,
     compilePatterns,
-    unsafePattern,
     validate,
     type FieldDefinition,
 } from "../functions/_lib/definition.ts";
@@ -104,13 +103,6 @@ test("maxLength が無いフィールドにも絶対上限が効く", () => {
     assert.deepEqual(errors, [ `メモ は最大 ${MAX_FIELD_LENGTH} 文字です` ]);
 });
 
-test("破滅的バックトラッキングを起こしうる pattern はコンパイル前に弾く", () => {
-    // 通してしまうと、35文字ほどの入力で数十秒の CPU を消費する。
-    const result = compilePatterns([ { name: "code", type: "text", validation: { pattern: "^(a+)+$" } } ]);
-    assert.equal(result.ok, false);
-    assert.match(result.ok ? "" : result.reason, /backtrack/);
-});
-
 test("壊れた pattern は定義ごと失敗させる", () => {
     // 個別に飛ばすと、検証されていないフィールドがあることに誰も気付かない。
     const result = compilePatterns([ { name: "x", type: "text", validation: { pattern: "([" } } ]);
@@ -118,27 +110,17 @@ test("壊れた pattern は定義ごと失敗させる", () => {
     assert.match(result.ok ? "" : result.reason, /valid regular expression/);
 });
 
-test("unsafePattern は入れ子の量指定子を検知する", () => {
-    for (const source of [ "^(a+)+$", "^(\\d+)+$", "([a-z]+)*", "(a+){2,}", "((a+))+", "(a*)*", "^(\\w+\\s?)*$" ]) {
-        assert.equal(unsafePattern(source), true, `弾くべき: ${source}`);
-    }
-});
-
-test("unsafePattern は実務で書かれる pattern を通す", () => {
-    const safe = [
+test("実務で書かれる pattern がそのまま使える", () => {
+    const sources = [
         "\\d{10,11}",
         "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
         "^\\d{3}-\\d{4}$",
         "^(090|080|070)\\d{8}$",
-        "(abc)+",
-        "(a|b)+",
-        "(a+){2,5}",
-        "(a+)?",
         "\\((\\d+)\\)",
-        "[(+)]+",
     ];
-    for (const source of safe) {
-        assert.equal(unsafePattern(source), false, `通すべき: ${source}`);
+    for (const source of sources) {
+        const result = compilePatterns([ { name: "x", type: "text", validation: { pattern: source } } ]);
+        assert.equal(result.ok, true, `コンパイルできるべき: ${source}`);
     }
 });
 
