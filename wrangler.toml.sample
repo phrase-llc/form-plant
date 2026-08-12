@@ -11,3 +11,10 @@ SES_FROM_ADDRESS="from@example.com"
 SES_TO_ADDRESS="to@example.com"
 TURNSTILE_SECRET_KEY="0x*******"
 ALLOWED_ORIGINS="http://localhost:8788"
+
+[[kv_namespaces]]
+# サイト設定とフォーム定義を console から投影する先。
+# ingest は site:<site_key> を読み、公開の定義エンドポイントは form:<site_key>:<slug> を返す。
+binding = "CONFIG"
+id = "0e77bbc1857c4d6db6d5362a55256ad9"
+preview_id = "e27fb3eeb48541668ab3d167a869fdaa"
