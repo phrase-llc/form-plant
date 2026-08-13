@@ -38,7 +38,8 @@
     return;
   }
 
-  if (formDef.some(f => f.type === "turnstile")) loadTurnstileScript();
+  const hasTurnstile = formDef.some(f => f.type === "turnstile");
+  if (hasTurnstile) loadTurnstileScript();
 
   const form = document.createElement("form");
   form.id = "fp-form";
@@ -110,7 +111,11 @@
         form.reset();
         // form.reset() は Turnstile ウィジェットを戻さない。トークンは単回使用なので、
         // ここでリセットしないと2回目の送信が必ずトークン無しで失敗する。
-        window.turnstile?.reset();
+        //
+        // セレクタで自分のウィジェットに限定する。引数無しで呼ぶと最初に描画された
+        // ウィジェットが対象になり、ホストページが別に Turnstile を使っている場合に
+        // そちらを戻してしまう。
+        if (hasTurnstile) window.turnstile?.reset("#contact-form .cf-turnstile");
         statusDiv.textContent = messages.success;
         statusDiv.classList.remove("fp-status-error");
         statusDiv.classList.add("fp-status-success");
