@@ -40,7 +40,9 @@ Note: earlier revisions read allowed origins and the Turnstile secret from a KV 
 | `data-form-url` | URL of the JSON form definition (required) |
 | `data-api-url` | submit endpoint; defaults to the script's own origin + `/api/submit` |
 
-`data-api-url` defaults to the origin the script itself was served from, not a fixed URL. A hardcoded default sends submissions to whichever deployment that URL names, so anyone who deploys their own copy and forgets the attribute silently posts their visitors' messages to someone else's inbox.
+`data-api-url` defaults to the origin the script itself was served from, not a fixed URL. A hardcoded default sends submissions to whichever deployment that URL names, so anyone who deploys their own copy and forgets the attribute silently posts their visitors' messages to someone else's inbox. Pasting the script's contents inline leaves nothing to derive the origin from, so `data-api-url` is required in that case and the widget says so instead of rendering.
+
+`SITE_LABEL` falls back to the matched allowed origin when it is unset. One deployment can serve several landing pages, and the subject line is the only thing distinguishing them once they share an inbox. The fallback is safe to put in a subject because it is only ever a string from `ALLOWED_ORIGINS` — the sender picks which one, never what it says.
 
 `data-lp` is gone. It named the landing page and its value went into the mail subject, which let the sender choose part of the subject line. The subject label now comes from `SITE_LABEL` on the server. Host pages that still carry the attribute are unaffected; it is simply ignored.
 

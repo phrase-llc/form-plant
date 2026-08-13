@@ -47,6 +47,10 @@ export async function onRequest(
             return jsonResponse({ error: "Invalid JSON" }, 400, corsHeaders);
         }
 
+        if (typeof body !== "object" || body === null) {
+            return jsonResponse({ error: "Invalid JSON" }, 400, corsHeaders);
+        }
+
         const token = body["cf-turnstile-response"];
         if (typeof token !== "string" || token === "" || !env.TURNSTILE_SECRET_KEY) {
             return jsonResponse({ error: "Missing Turnstile verification" }, 400, corsHeaders);
@@ -79,10 +83,16 @@ export async function onRequest(
             .map(([key, value]) => `${key}: ${value}`)
             .join("\n");
 
-        // 件名の表示名はサーバが持つ値を使う。以前はクライアントが送る lp_code を
-        // 入れていたが、件名の一部を送信者が決められる状態だった。
-        const subject = env.SITE_LABEL
-            ? `【FormPlant】お問い合わせ from ${env.SITE_LABEL}`
+        // 件名の表示名はサーバが持つ値だけから決める。以前はクライアントが送る
+        // lp_code を入れていたので、件名の一部を送信者が決められた。
+        //
+        // SITE_LABEL が無いときは許可オリジンで代用する。origin はクライアントが
+        // 申告する値だが、allowOrigin は ALLOWED_ORIGINS に載っている文字列しか
+        // 取らないので、任意の文字列を差し込むことはできない。1つのデプロイが
+        // 複数の LP を受けている場合、これが唯一の判別材料になる。
+        const label = env.SITE_LABEL || allowOrigin;
+        const subject = label
+            ? `【FormPlant】お問い合わせ from ${label}`
             : "【FormPlant】お問い合わせ";
 
         const client = new SESv2Client({
@@ -110,7 +120,7 @@ export async function onRequest(
         // SES のエラー文は検証済みでないアドレスなど AWS 側の事情を含む。
         // ウィジェットはサーバの文字列を画面に出しうるので、送信者には渡さない。
         console.error("submit failed:", error);
-        return jsonResponse({ error: "Internal error" }, 500, corsHeaders);
+        return jsonResponse({ error: "送信に失敗しました" }, 500, corsHeaders);
     }
 }
 

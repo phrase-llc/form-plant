@@ -2,14 +2,21 @@
   const container = document.getElementById("contact-form");
   if (!container) return;
 
+  // currentScript は module として読まれると null になる。ここで投げると
+  // 以降のエラー表示にも到達せず、ページには何も出ない。
   const scriptEl = document.currentScript;
+  if (!scriptEl) {
+    container.innerHTML = `<div class="fp-error">フォームを初期化できませんでした。</div>`;
+    console.error("document.currentScript が取れません。このスクリプトは module ではなく通常の script として読んでください");
+    return;
+  }
+
   const formUrl = scriptEl.getAttribute("data-form-url");
 
   // 既定の送信先はこのスクリプトの配信元。理由は CLAUDE.md。
   // src が空になるのは中身をインラインで貼った場合で、配信元をたどれない。
-  // 末尾のスラッシュは落とす。付いていると /api/submit に一致しない。
-  const apiUrl = (scriptEl.getAttribute("data-api-url")
-    || (scriptEl.src && new URL(scriptEl.src).origin + "/api/submit") || "").replace(/\/+$/, "");
+  const apiUrl = scriptEl.getAttribute("data-api-url")
+    || (scriptEl.src && new URL(scriptEl.src).origin + "/api/submit");
 
   if (!apiUrl) {
     container.innerHTML = `<div class="fp-error">フォームの設定が不足しています。</div>`;
@@ -39,8 +46,7 @@
     return;
   }
 
-  const hasTurnstile = formDef.some(f => f.type === "turnstile");
-  if (hasTurnstile) loadTurnstileScript();
+  if (formDef.some(f => f.type === "turnstile")) loadTurnstileScript();
 
   const form = document.createElement("form");
   form.id = "fp-form";
@@ -63,6 +69,9 @@
   form.appendChild(statusDiv);
 
   container.appendChild(form);
+
+  // 自分が描画した Turnstile の要素。無ければリセットの対象も無い。
+  const turnstileEl = form.querySelector(".cf-turnstile");
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -110,13 +119,6 @@
 
       if (res.ok) {
         form.reset();
-        // form.reset() は Turnstile ウィジェットを戻さない。トークンは単回使用なので、
-        // ここでリセットしないと2回目の送信が必ずトークン無しで失敗する。
-        //
-        // セレクタで自分のウィジェットに限定する。引数無しで呼ぶと最初に描画された
-        // ウィジェットが対象になり、ホストページが別に Turnstile を使っている場合に
-        // そちらを戻してしまう。
-        if (hasTurnstile) window.turnstile?.reset("#contact-form .cf-turnstile");
         statusDiv.textContent = messages.success;
         statusDiv.classList.remove("fp-status-error");
         statusDiv.classList.add("fp-status-success");
@@ -131,6 +133,23 @@
       statusDiv.classList.add("fp-status-error");
     } finally {
       submit.disabled = false;
+
+      // form.reset() は Turnstile ウィジェットを戻さない。トークンは siteverify を
+      // 通った時点で消費されるので、失敗したときも戻さないと、再送信が消費済みの
+      // トークンを送って必ず 403 になる。再送信の動機は失敗時のほうが強い。
+      //
+      // 自分が描画した要素を渡して対象を限定する。引数を省くと最初に描画された
+      // ウィジェットが対象になり、ホストページが別に Turnstile を使っていると
+      // そちらを戻してしまう。
+      //
+      // リセット自体の失敗で送信結果の表示を塗り替えないよう、ここで閉じる。
+      if (turnstileEl) {
+        try {
+          window.turnstile?.reset(turnstileEl);
+        } catch (err) {
+          console.error(err);
+        }
+      }
     }
   });
 
@@ -149,8 +168,17 @@
         // HTML の pattern 属性と同じ完全一致にする。これらの正規表現はその属性から
         // 写されてくるので、アンカー無しのままだと意味が変わる。部分一致になり、
         // `\d{10,11}` を指定したフィールドに任意の長さの文字列が通る。
-        const regex = new RegExp(`^(?:${field.validation.pattern})$`);
-        if (!regex.test(value)) {
+        //
+        // 定義側の正規表現が壊れていると new RegExp が投げる。この関数は送信処理の
+        // try の外から呼ばれるので、投げるとボタンを押しても何も起きない状態になる。
+        // 定義を書いた人にしか直せないため、記録して検証を飛ばす。
+        let regex = null;
+        try {
+          regex = new RegExp(`^(?:${field.validation.pattern})$`);
+        } catch (err) {
+          console.error(`フィールド ${field.name} の pattern が不正です`, err);
+        }
+        if (regex && !regex.test(value)) {
           return field.validation.message || `${field.label} の形式が正しくありません`;
         }
       }
