@@ -4,7 +4,13 @@
 
   const scriptEl = document.currentScript;
   const formUrl = scriptEl.getAttribute("data-form-url");
-  const lpCode = scriptEl.getAttribute("data-lp") || "unknown";
+
+  // 送信先の既定はこのスクリプトの配信元にする。固定の URL を既定にすると、
+  // 自分で配置した人が data-api-url を書き忘れたときに、送信内容が
+  // 他人のデプロイに届いてしまう。
+  // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
+  const apiUrl = (scriptEl.getAttribute("data-api-url")
+    || new URL(scriptEl.src).origin + "/api/submit").replace(/\/+$/, "");
 
   let formDef = [];
   let messages = {
@@ -17,7 +23,10 @@
     const res = await fetch(formUrl);
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
-    formDef = json.fields || json;
+    // 配列でなければ描画に進まない。オブジェクトを代入してしまうと、この try の外で
+    // 配列メソッドが投げ、フォームが何も表示されないまま消える。
+    formDef = Array.isArray(json.fields) ? json.fields : json;
+    if (!Array.isArray(formDef)) throw new Error("フォーム定義に fields がありません");
     if (json.messages) messages = { ...messages, ...json.messages };
   } catch (err) {
     container.innerHTML = `<div class="fp-error">フォーム定義の読み込みに失敗しました。</div>`;
@@ -55,7 +64,7 @@
     statusDiv.className = "fp-status";
     clearErrors();
 
-    const payload = { lp_code: lpCode };
+    const payload = {};
     let hasError = false;
 
     for (const field of formDef) {
@@ -84,7 +93,8 @@
       return;
     }
 
-    const apiUrl = scriptEl.getAttribute("data-api-url") || "https://form-plant.pages.dev/api/submit";
+    // 連打すると同じ内容のメールが複数届く。送信中はボタンを止める。
+    submit.disabled = true;
     try {
       const res = await fetch(apiUrl, {
         method: "POST",
@@ -94,18 +104,23 @@
 
       if (res.ok) {
         form.reset();
+        // form.reset() は Turnstile ウィジェットを戻さない。トークンは単回使用なので、
+        // ここでリセットしないと2回目の送信が必ずトークン無しで失敗する。
+        window.turnstile?.reset();
         statusDiv.textContent = messages.success;
         statusDiv.classList.remove("fp-status-error");
         statusDiv.classList.add("fp-status-success");
       } else {
-        const data = await res.json().catch(() => null);
-        statusDiv.textContent = data?.error || messages.error;
+        // サーバのエラー文には SES など内部の事情が混じる。画面には出さない。
+        statusDiv.textContent = messages.error;
         statusDiv.classList.add("fp-status-error");
       }
     } catch (err) {
       console.error(err);
       statusDiv.textContent = messages.error;
       statusDiv.classList.add("fp-status-error");
+    } finally {
+      submit.disabled = false;
     }
   });
 
@@ -121,7 +136,10 @@
 
     if (typeof value === "string") {
       if (field.validation?.pattern) {
-        const regex = new RegExp(field.validation.pattern);
+        // HTML の pattern 属性と同じ完全一致にする。これらの正規表現はその属性から
+        // 写されてくるので、アンカー無しのままだと意味が変わる。部分一致になり、
+        // `\d{10,11}` を指定したフィールドに任意の長さの文字列が通る。
+        const regex = new RegExp(`^(?:${field.validation.pattern})$`);
         if (!regex.test(value)) {
           return field.validation.message || `${field.label} の形式が正しくありません`;
         }
