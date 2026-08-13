@@ -5,18 +5,19 @@
   const scriptEl = document.currentScript;
   const formUrl = scriptEl.getAttribute("data-form-url");
 
-  // 送信先の既定はこのスクリプトの配信元にする。固定の URL を既定にすると、
-  // 自分で配置した人が data-api-url を書き忘れたときに、送信内容が
-  // 他人のデプロイに届いてしまう。
-  //
-  // src が空になるのは、このファイルの中身をインラインで貼った場合。
-  // new URL("") は投げるので、その場合はページのオリジンを使う。
-  // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
-  const scriptOrigin = scriptEl.src ? new URL(scriptEl.src).origin : location.origin;
+  // 既定の送信先はこのスクリプトの配信元。理由は CLAUDE.md。
+  // src が空になるのは中身をインラインで貼った場合で、配信元をたどれない。
+  // 末尾のスラッシュは落とす。付いていると /api/submit に一致しない。
   const apiUrl = (scriptEl.getAttribute("data-api-url")
-    || scriptOrigin + "/api/submit").replace(/\/+$/, "");
+    || (scriptEl.src && new URL(scriptEl.src).origin + "/api/submit") || "").replace(/\/+$/, "");
 
-  let formDef = [];
+  if (!apiUrl) {
+    container.innerHTML = `<div class="fp-error">フォームの設定が不足しています。</div>`;
+    console.error("送信先が決まりません。スクリプトをインラインで置く場合は data-api-url が要ります");
+    return;
+  }
+
+  let formDef;
   let messages = {
     success: "送信が完了しました。ありがとうございます！",
     error: "送信に失敗しました。",
@@ -27,8 +28,8 @@
     const res = await fetch(formUrl);
     if (!res.ok) throw new Error("フォーム定義が取得できません");
     const json = await res.json();
-    // 配列でなければ描画に進まない。オブジェクトを代入してしまうと、この try の外で
-    // 配列メソッドが投げ、フォームが何も表示されないまま消える。
+    // 配列でないまま進むと、この try の外で配列メソッドが投げ、
+    // エラー表示にも到達しないままフォームが消える。
     formDef = Array.isArray(json.fields) ? json.fields : json;
     if (!Array.isArray(formDef)) throw new Error("フォーム定義に fields がありません");
     if (json.messages) messages = { ...messages, ...json.messages };
@@ -98,7 +99,7 @@
       return;
     }
 
-    // 連打すると同じ内容のメールが複数届く。送信中はボタンを止める。
+    // 連打すると同じ内容のメールが複数届く。
     submit.disabled = true;
     try {
       const res = await fetch(apiUrl, {

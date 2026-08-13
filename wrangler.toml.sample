@@ -11,5 +11,5 @@ SES_FROM_ADDRESS="from@example.com"
 SES_TO_ADDRESS="to@example.com"
 TURNSTILE_SECRET_KEY="0x*******"
 ALLOWED_ORIGINS="http://localhost:8788"
-# 任意。メールの件名に付ける表示名。未設定なら件名は「【FormPlant】お問い合わせ」だけになる。
-MAIL_SUBJECT_LABEL="example.com"
+# 任意。メールの件名に付ける、このサイトの表示名。未設定なら件名は「【FormPlant】お問い合わせ」だけになる。
+SITE_LABEL="example.com"
