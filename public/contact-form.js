@@ -8,9 +8,13 @@
   // 送信先の既定はこのスクリプトの配信元にする。固定の URL を既定にすると、
   // 自分で配置した人が data-api-url を書き忘れたときに、送信内容が
   // 他人のデプロイに届いてしまう。
+  //
+  // src が空になるのは、このファイルの中身をインラインで貼った場合。
+  // new URL("") は投げるので、その場合はページのオリジンを使う。
   // 末尾のスラッシュは落とす。付けて書かれると URL に `//` が生まれる。
+  const scriptOrigin = scriptEl.src ? new URL(scriptEl.src).origin : location.origin;
   const apiUrl = (scriptEl.getAttribute("data-api-url")
-    || new URL(scriptEl.src).origin + "/api/submit").replace(/\/+$/, "");
+    || scriptOrigin + "/api/submit").replace(/\/+$/, "");
 
   let formDef = [];
   let messages = {
