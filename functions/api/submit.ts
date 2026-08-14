@@ -104,9 +104,9 @@ export async function onRequest(
             status: 200,
             headers: { "Content-Type": "application/json", ...corsHeaders },
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error("SES send error:", error);
-        return new Response(JSON.stringify({ error: error.message || "SES送信に失敗しました" }), {
+        return new Response(JSON.stringify({ error: "Email delivery failed" }), {
             status: 500,
             headers: { "Content-Type": "application/json", ...corsHeaders },
         });

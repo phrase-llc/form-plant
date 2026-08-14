@@ -104,8 +104,7 @@
         statusDiv.classList.remove("fp-status-error");
         statusDiv.classList.add("fp-status-success");
       } else {
-        const data = await res.json().catch(() => null);
-        statusDiv.textContent = data?.error || messages.error;
+        statusDiv.textContent = messages.error;
         statusDiv.classList.add("fp-status-error");
       }
     } catch (err) {
