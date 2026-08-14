@@ -56,8 +56,12 @@
     font-size: 1em;
     cursor: pointer;
 }
-.fp-submit:hover {
+.fp-submit:not(:disabled):hover {
     background-color: #0056b3;
+}
+.fp-submit:disabled {
+    background-color: #9ec7f5;
+    cursor: default;
 }
 
 /* === ステータスメッセージ === */
