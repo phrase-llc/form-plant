@@ -106,6 +106,9 @@
       console.error(err);
       statusDiv.textContent = messages.error;
       statusDiv.classList.add("fp-status-error");
+    } finally {
+      const turnstileEl = form.querySelector(".cf-turnstile");
+      if (turnstileEl) window.turnstile?.reset(turnstileEl);
     }
   });
 
