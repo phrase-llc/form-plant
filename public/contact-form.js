@@ -85,14 +85,20 @@
     }
 
     const apiUrl = scriptEl.getAttribute("data-api-url") || "https://form-plant.pages.dev/api/submit";
+    let sent = false;
+    submit.disabled = true;
+    submit.textContent = "送信中…";
     try {
       const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout?.(30000),
       });
 
       if (res.ok) {
+        sent = true;
+        submit.textContent = "送信済み";
         form.reset();
         statusDiv.textContent = messages.success;
         statusDiv.classList.remove("fp-status-error");
@@ -107,8 +113,12 @@
       statusDiv.textContent = messages.error;
       statusDiv.classList.add("fp-status-error");
     } finally {
-      const turnstileEl = form.querySelector(".cf-turnstile");
-      if (turnstileEl) window.turnstile?.reset(turnstileEl);
+      if (!sent) {
+        submit.disabled = false;
+        submit.textContent = "送信";
+        const turnstileEl = form.querySelector(".cf-turnstile");
+        if (turnstileEl) window.turnstile?.reset(turnstileEl);
+      }
     }
   });
 

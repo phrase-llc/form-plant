@@ -43,6 +43,8 @@ Note: earlier revisions read allowed origins and the Turnstile secret from a KV 
 
 It renders into `#contact-form` on the host page and does nothing if that element is absent.
 
+**The submit button stays disabled after a successful send, and that is deliberate — not a bug to fix.** Re-enabling it would leave a clickable button next to a Turnstile widget that has to be solved again before it does anything, so pressing it just returns a 400. The Turnstile token is deliberately not refreshed on success for the same reason. Sending a second message means reloading the page.
+
 **Form definition JSON** (see `public/test.json` for the canonical example) drives everything: `{ messages?, fields[] }`, or a bare array of fields. Each field has `name`, `label`, `type` (`text`/`email`/`textarea`/`select`/`radio`/`checkbox`/`turnstile` — anything else falls through to an `<input>` of that type), optional `required`, `options[]` for select/radio, and `validation` (`pattern`, `minLength`, `maxLength`, `message`). Adding a field type means touching `renderField()` and, if its value isn't read off `form.elements[name].value`, the submit handler and `validateField()` too.
 
 A `turnstile` field is special-cased: it injects the Cloudflare Turnstile script, renders a `.cf-turnstile` div with the field's `sitekey`, and is skipped by the payload/validation loop — the token is picked up separately from the widget-injected `cf-turnstile-response` input.
