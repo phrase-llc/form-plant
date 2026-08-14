@@ -2,18 +2,38 @@
 // @aws-sdk/xml-builder の browser 版（DOMParser 依存）に解決されて workerd で落ちる。
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 
+// 例外は return を経由しないので、return 側に corsHeaders を撒くだけでは足りない。
 export async function onRequest(
-    { request, env }: { request: Request; env: Record<string, string> }
+    ctx: { request: Request; env: Record<string, string> }
 ): Promise<Response> {
+    try {
+        return await handleSubmit(ctx);
+    } catch (error) {
+        console.error("Submit failed:", error);
+        return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeadersFor(ctx.request, ctx.env) },
+        });
+    }
+}
+
+function corsHeadersFor(request: Request, env: Record<string, string>): Record<string, string> {
     const origin = request.headers.get("Origin") || "";
-    const allowedOrigins = (env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim());
+    // catch から呼ぶので投げてはいけない。TOML では配列や数値も書ける。
+    const allowedOrigins = String(env?.ALLOWED_ORIGINS ?? "").split(",").map(o => o.trim());
     const allowOrigin = allowedOrigins.includes(origin) ? origin : "";
 
-    const corsHeaders = {
+    return {
         "Access-Control-Allow-Origin": allowOrigin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     };
+}
+
+async function handleSubmit(
+    { request, env }: { request: Request; env: Record<string, string> }
+): Promise<Response> {
+    const corsHeaders = corsHeadersFor(request, env);
 
     if (request.method === "OPTIONS") {
         return new Response(null, {
@@ -56,6 +76,15 @@ export async function onRequest(
             remoteip: request.headers.get("CF-Connecting-IP") || "",
         }),
     });
+
+    // 上流の障害を、検証が NG だった 403 と混同しないよう分ける。
+    if (!verifyResp.ok) {
+        console.error("Turnstile siteverify error:", verifyResp.status);
+        return new Response(JSON.stringify({ error: "Turnstile verification unavailable" }), {
+            status: 502,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+    }
 
     const verifyResult = await verifyResp.json<{ success: boolean; "error-codes"?: string[] }>();
     if (!verifyResult.success) {
