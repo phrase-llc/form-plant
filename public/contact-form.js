@@ -84,7 +84,8 @@
       return;
     }
 
-    const apiUrl = scriptEl.getAttribute("data-api-url") || "https://form-plant.pages.dev/api/submit";
+    const apiOrigin = scriptEl.src ? new URL(scriptEl.src).origin : location.origin;
+    const apiUrl = scriptEl.getAttribute("data-api-url") || apiOrigin + "/api/submit";
     let sent = false;
     submit.disabled = true;
     submit.textContent = "送信中…";
