@@ -39,7 +39,7 @@ Note: earlier revisions read allowed origins and the Turnstile secret from a KV 
 | --- | --- |
 | `data-form-url` | URL of the JSON form definition (required) |
 | `data-lp` | LP identifier, sent as `lp_code` and shown in the email subject |
-| `data-api-url` | submit endpoint; defaults to `https://form-plant.pages.dev/api/submit` |
+| `data-api-url` | submit endpoint; defaults to the origin the script itself was served from, plus `/api/submit` |
 
 It renders into `#contact-form` on the host page and does nothing if that element is absent.
 
