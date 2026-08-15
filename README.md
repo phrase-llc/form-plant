@@ -34,7 +34,10 @@ Cloudflare Pages から JavaScript と CSS を配信し、JSON の定義に従�
 - npm
 - Cloudflare Pages のプロジェクト
 - Cloudflare Turnstile のサイトキーとシークレットキー
-- 送信元IDを検証済みの AWS SES
+- 対象リージョンで送信元IDを検証済みの AWS SES
+
+SES が sandbox 内にある場合は、`SES_TO_ADDRESS` に指定する送信先IDも検証する必要があります。
+未検証の送信先へ送る場合は、SES の production access を取得してください。
 
 ## ローカル開発
 
@@ -59,6 +62,7 @@ npm run dev
 ブラウザで <http://localhost:8788/test.html> を開くと、`public/test.json` を使ったフォームを確認できます。
 サンプルには Turnstile の常時成功テスト用サイトキーが含まれています。
 Cloudflare が提供するテスト用キーは機密情報ではありませんが、本番環境では本番用キーへ置き換えます。
+送信まで確認する場合は、対応する常時成功テスト用シークレットキーをローカルの `wrangler.toml` に設定します。
 
 `wrangler.toml` は Git の追跡対象外です。
 実値を含むファイルをコミットしないでください。
@@ -198,7 +202,8 @@ Turnstile ウィジェットが発行したトークンを `cf-turnstile-respons
 ```
 
 サーバーは `cf-turnstile-response` を除く受信フィールドを `キー: 値` の形式でメール本文へ並べます。
-フォーム定義を変更してもサーバーのスキーマ変更を不要にするため、フィールド名や値の型をサーバー側で限定しない設計です。
+`lp_code` と `cf-turnstile-response` は予約キーであり、通常のフォーム項目名には使用できません。
+その他のフィールドは、フォーム定義を変更してもサーバーのスキーマ変更を不要にするため、名前や値の型をサーバー側で限定しない設計です。
 送信先は `SES_TO_ADDRESS` に固定され、クライアントから変更できません。
 
 ## 検証
@@ -219,19 +224,22 @@ CI は pull request と `main` ブランチへの push で三つの検査を実�
 ## デプロイ
 
 検証を通した後、Cloudflare Pages へデプロイします。
+本番デプロイには、開発用の `wrangler.toml` が存在しないクリーンな作業ディレクトリを使用してください。
+Pages では、作業ディレクトリの Wrangler 設定がデプロイ設定の正本になるため、開発用の変数を含む `wrangler.toml` から本番デプロイしてはいけません。
+本番用の環境変数とシークレットは、あらかじめ Cloudflare Pages の設定画面へ登録します。
 
 ```bash
 npm run typecheck
 npm run check:bundle
 npm run check:client
-npx wrangler pages deploy public --project-name form-plant
+npx wrangler pages deploy public --project-name form-plant --branch main
 ```
 
-デプロイ前に Pages の環境変数とシークレットを登録し、`ALLOWED_ORIGINS` に本番の埋め込み先 Origin を追加してください。
+デプロイ前に `ALLOWED_ORIGINS` へ本番の埋め込み先 Origin を追加してください。
 
 ## 設計上の特性と制約
 
-- サーバーは任意のフォーム項目を受け取り、Turnstile トークンを除いてメール本文へ変換します。
+- サーバーは予約キーを除く任意のフォーム項目を受け取り、Turnstile トークンを除いてメール本文へ変換します。
 - アプリケーション固有の本文サイズ制限とレート制限は設けず、Turnstile、Cloudflare、AWS SES の制限を利用します。
 - すべての埋め込み先が、同じ SES 送信元と送信先を共有します。
 - 自動テストはなく、ブラウザでの送信確認は手動です。
